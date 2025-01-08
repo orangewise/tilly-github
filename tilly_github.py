@@ -111,6 +111,7 @@ def build_database(repo_path):
         with db.conn:
             table.upsert(record, alter=True)
 
+    # enable full text search
     table.enable_fts(
         ["title", "body"], tokenize="porter", create_triggers=True, replace=True
     )
