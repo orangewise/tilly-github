@@ -58,7 +58,7 @@ def config_file():
     return get_app_dir() / "github_config.json"
 
 def load_config():
-    config_path = config_file
+    config_path = config_file()
 
     if config_path.exists():
         return json.loads(config_path.read_text())
@@ -68,6 +68,7 @@ def load_config():
 
 def build_database(repo_path):
     echo(f"build_database {repo_path}")
+    config = load_config()
     all_times = created_changed_times(repo_path)
     db = sqlite_utils.Database(repo_path / "tils.db")
     table = db.table("til", pk="path")
@@ -77,7 +78,7 @@ def build_database(repo_path):
         body = fp.read().strip()
         path = str(filepath.relative_to(root))
         slug = filepath.stem
-        url = "https://github.com/simonw/til/blob/main/{}".format(path)
+        url = config.get("url", "") + "{}".format(path)
         # Do we need to render the markdown?
         path_slug = path.replace("/", "_")
         try:
@@ -144,17 +145,18 @@ def build_database(repo_path):
 
 
 
-def first_paragraph_text_only(soup):
+def first_paragraph_text_only(html):
     """
-    Extracts and returns the text of the first paragraph from a BeautifulSoup object.
+    Extracts and returns the text of the first paragraph from a html object.
 
     Args:
-        soup (BeautifulSoup): A BeautifulSoup object representing the HTML content.
+        html: The HTML content.
 
     Returns:
         str: The text of the first paragraph, or an empty string if not found.
     """
     try:
+        soup = BeautifulSoup(html, "html.parser")
         # Attempt to find the first paragraph and extract its text
         first_paragraph = soup.find('p')
         return ' '.join(first_paragraph.stripped_strings)
