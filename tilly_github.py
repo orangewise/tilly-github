@@ -1,4 +1,11 @@
+import json
+import pathlib
+
+import click
 from click import echo
+from click_default_group import DefaultGroup
+
+from tilly.utils import get_app_dir
 from tilly.plugins import hookimpl
 
 from bs4 import BeautifulSoup
@@ -17,83 +24,46 @@ root = pathlib.Path.cwd()
 
 @hookimpl
 def til_command(cli):
-    @cli.command()
+    @cli.group(
+        cls=DefaultGroup,
+        default="build",
+        default_if_no_args=True,
+    )
     def github():
         """Publish TILs with github."""
+
+    @github.command(name="build")
+    def github_build():
+        """Build database tils.db"""
         build_database(root)
 
+    @github.command(name="config")
+    @click.option("url", "-u", "--url", help="Base url where posts will be published.")
+    def config(url):
+        """List config."""
+        config_path = config_file()
 
-def first_paragraph_text_only(soup):
-    """
-    Extracts and returns the text of the first paragraph from a BeautifulSoup object.
+        config = {
+            "url": url
+        }
 
-    Args:
-        soup (BeautifulSoup): A BeautifulSoup object representing the HTML content.
+        if url:
+            with open(config_path, "w") as f:
+                json.dump(config, f, indent=4)
 
-    Returns:
-        str: The text of the first paragraph, or an empty string if not found.
-    """
-    try:
-        # Attempt to find the first paragraph and extract its text
-        first_paragraph = soup.find('p')
-        return ' '.join(first_paragraph.stripped_strings)
-    except AttributeError:
-        # Handle the case where 'soup.find('p')' returns None
-        return ""
+        echo(config_path)
+        echo(json.dumps(config, indent=4, default=str))
 
-def created_changed_times(repo_path, ref="main"):
-    """
-    Extract creation and modification timestamps for all files in a git repository.
+def config_file():
+    return get_app_dir() / "github_config.json"
 
-    Args:
-        repo_path (str): Path to the git repository
-        ref (str, optional): Git reference (branch, tag, commit). Defaults to "main"
+def load_config():
+    config_path = config_file
 
-    Returns:
-        dict: Dictionary with filepaths as keys and nested dictionaries as values containing:
-            - created: Initial commit timestamp in local timezone
-            - created_utc: Initial commit timestamp in UTC
-            - updated: Latest commit timestamp in local timezone
-            - updated_utc: Latest commit timestamp in UTC
-
-    Raises:
-        ValueError: If repository has uncommitted changes or untracked files
-    """
-    # Initialize empty dictionary to store file timestamps
-    created_changed_times = {}
-
-    # Open git repository with GitDB backend
-    repo = git.Repo(repo_path, odbt=git.GitDB)
-
-    # Ensure working directory is clean before processing
-    if repo.is_dirty() or repo.untracked_files:
-        raise ValueError("The repository has changes or untracked files.")
-
-    # Get commits in reverse chronological order (oldest first)
-    commits = reversed(list(repo.iter_commits(ref)))
-
-    # Process each commit
-    for commit in commits:
-        dt = commit.committed_datetime
-        # Get list of files modified in this commit
-        affected_files = list(commit.stats.files.keys())
-
-        # Update timestamps for each affected file
-        for filepath in affected_files:
-            # If file not seen before, record creation time
-            if filepath not in created_changed_times:
-                created_changed_times[filepath] = {
-                    "created": dt.isoformat(),
-                    "created_utc": dt.astimezone(timezone.utc).isoformat(),
-                }
-            # Always update the modification time
-            created_changed_times[filepath].update(
-                {
-                    "updated": dt.isoformat(),
-                    "updated_utc": dt.astimezone(timezone.utc).isoformat(),
-                }
-            )
-    return created_changed_times
+    if config_path.exists():
+        return json.loads(config_path.read_text())
+    else:
+        return {}
 
 
 def build_database(repo_path):
@@ -171,4 +141,78 @@ def build_database(repo_path):
     table.enable_fts(
         ["title", "body"], tokenize="porter", create_triggers=True, replace=True
     )
+
+
+
+def first_paragraph_text_only(soup):
+    """
+    Extracts and returns the text of the first paragraph from a BeautifulSoup object.
+
+    Args:
+        soup (BeautifulSoup): A BeautifulSoup object representing the HTML content.
+
+    Returns:
+        str: The text of the first paragraph, or an empty string if not found.
+    """
+    try:
+        # Attempt to find the first paragraph and extract its text
+        first_paragraph = soup.find('p')
+        return ' '.join(first_paragraph.stripped_strings)
+    except AttributeError:
+        # Handle the case where 'soup.find('p')' returns None
+        return ""
+
+def created_changed_times(repo_path, ref="main"):
+    """
+    Extract creation and modification timestamps for all files in a git repository.
+
+    Args:
+        repo_path (str): Path to the git repository
+        ref (str, optional): Git reference (branch, tag, commit). Defaults to "main"
+
+    Returns:
+        dict: Dictionary with filepaths as keys and nested dictionaries as values containing:
+            - created: Initial commit timestamp in local timezone
+            - created_utc: Initial commit timestamp in UTC
+            - updated: Latest commit timestamp in local timezone
+            - updated_utc: Latest commit timestamp in UTC
+
+    Raises:
+        ValueError: If repository has uncommitted changes or untracked files
+    """
+    # Initialize empty dictionary to store file timestamps
+    created_changed_times = {}
+
+    # Open git repository with GitDB backend
+    repo = git.Repo(repo_path, odbt=git.GitDB)
+
+    # Ensure working directory is clean before processing
+    if repo.is_dirty() or repo.untracked_files:
+        raise ValueError("The repository has changes or untracked files.")
+
+    # Get commits in reverse chronological order (oldest first)
+    commits = reversed(list(repo.iter_commits(ref)))
+
+    # Process each commit
+    for commit in commits:
+        dt = commit.committed_datetime
+        # Get list of files modified in this commit
+        affected_files = list(commit.stats.files.keys())
+
+        # Update timestamps for each affected file
+        for filepath in affected_files:
+            # If file not seen before, record creation time
+            if filepath not in created_changed_times:
+                created_changed_times[filepath] = {
+                    "created": dt.isoformat(),
+                    "created_utc": dt.astimezone(timezone.utc).isoformat(),
+                }
+            # Always update the modification time
+            created_changed_times[filepath].update(
+                {
+                    "updated": dt.isoformat(),
+                    "updated_utc": dt.astimezone(timezone.utc).isoformat(),
+                }
+            )
+    return created_changed_times
 
