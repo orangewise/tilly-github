@@ -30,6 +30,7 @@ def til_command(cli):
         default="build",
         default_if_no_args=True,
     )
+    @click.version_option(message="tilly-github, version %(version)s")
     def github():
         """Publish TILs with github."""
 
