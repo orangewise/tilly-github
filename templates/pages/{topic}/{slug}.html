@@ -1,0 +1,98 @@
+{% extends "til_base.html" %}
+
+{% set tils = sql("""
+    select * from til where path = :topic || '_' || :slug || '.md'
+""", {"topic": topic, "slug": slug}, database="tils")
+%}
+{% set til = tils[0] %}
+{% if not tils %}
+    {% set raised = raise_404("TIL not found") %}
+{% endif %}
+
+{% block title %}{{ til.title }} | TILs{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="/static/github-light.css">
+<script>
+// Fix broken images if data-canonical-src is available
+function handleImageError(event) {
+  if (event.target.tagName === 'IMG') {
+    const canonicalSrc = event.target.getAttribute('data-canonical-src');
+    if (canonicalSrc) {
+      event.target.src = canonicalSrc;
+    }
+  }
+}
+document.addEventListener('DOMContentLoaded', () => {
+  document.body.addEventListener('error', handleImageError, true);
+});
+</script>
+{% endblock %}
+
+{% block body %}
+<h1>{{ til.title }}</h1>
+
+{{ til.html|safe }}
+
+{# similarities table not yet created, check https://til.simonwillison.net/llms/openai-embeddings-related-content
+{% set related = related_tils(til) %}
+{% if related %}
+  <h3 id="related">Related</h3>
+  <ul class="related">
+    {% for til in related %}
+    <li><span class="topic">{{ til.topic }}</span> <a href="/{{ til.topic }}/{{ til.slug }}">{{ til.title }}</a> - {{ til.created[:10] }}</li>
+    {% endfor %}
+  </ul>
+{% endif %}
+#}
+
+<p class="created">Created {{ til.created }}{% if til.created != til.updated %}, updated {{ til.updated }} &middot; <a href="{{ til.url|replace("https://github.com/simonw/til/blob/", "https://github.com/simonw/til/commits/") }}">History</a>{% endif %} &middot; <a href="{{ til.url }}">Edit</a></p>
+
+<script>
+// Add visible # links to all h2+ headings
+document.querySelectorAll('h2,h3,h4,h5,h6').forEach(el => {
+  // New style of links
+  let id = null;
+  let newStyle = el.querySelector('.heading-link');
+  if (newStyle) {
+    // Keep using existing ID on element
+    id = el.getAttribute('id');
+    // Need to pull the text out of the link
+    let text = newStyle.innerText;
+    el.removeChild(newStyle);
+    el.innerText = text;
+  } else {
+    let anchor = el.querySelector('a.anchor');
+    if (anchor) {
+      id = anchor.getAttribute('id');
+      el.removeChild(anchor);
+    }
+  }
+  if (!id) {
+    return;
+  }
+  el.setAttribute('id', id);
+  let hashLink = document.createElement('a');
+  hashLink.style.textDecoration = 'none';
+  hashLink.style.color = '#b7b3b3';
+  hashLink.style.fontSize = '0.8em';
+  hashLink.setAttribute('href', '#' + id);
+  hashLink.innerText = '#';
+  el.appendChild(document.createTextNode(' '));
+  // Add that link
+  el.appendChild(hashLink);
+});
+
+// Add an audio player after any .wav or .mp3 links
+// Get all anchor tags on the page
+document.querySelectorAll('a[href$=".wav"],a[href$=".mp3"],a[href$=".m4a"]').forEach(function(link) {
+  var href = link.getAttribute('href');
+  var audio = document.createElement('audio');
+  audio.controls = true;  // Show controls
+  audio.src = href;
+  var paragraph = document.createElement('p');
+  paragraph.appendChild(audio);
+  link.insertAdjacentElement('afterend', paragraph);
+});
+</script>
+{% endblock %}

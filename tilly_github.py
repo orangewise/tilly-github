@@ -20,6 +20,10 @@ from sqlite_utils.db import NotFoundError
 import time
 import markdown
 
+from datasette.app import Datasette
+import uvicorn
+from asgiref.sync import async_to_sync
+
 root = pathlib.Path.cwd()
 
 
@@ -36,8 +40,19 @@ def til_command(cli):
 
     @github.command(name="build")
     def github_build():
-        """Build database tils.db"""
+        """Build database tils.db."""
         build_database(root)
+
+    @github.command(name="serve")
+    def serve():
+        """Serve tils.db using datasette."""
+        serve_datasette()
+
+    @github.command(name="gen_static")
+    def gen_static():
+        """Generate static site from tils.db using datasette."""
+        urls = ["/", "/cat_a/til_1"]
+        get(urls=urls)
 
     @github.command(name="config")
     @click.option("url", "-u", "--url", help="Base url where posts will be published.")
@@ -45,9 +60,7 @@ def til_command(cli):
         """List config."""
         config_path = config_file()
 
-        config = {
-            "url": url
-        }
+        config = {"url": url}
 
         if url:
             with open(config_path, "w") as f:
@@ -56,8 +69,10 @@ def til_command(cli):
         echo(config_path)
         echo(json.dumps(config, indent=4, default=str))
 
+
 def config_file():
     return get_app_dir() / "github_config.json"
+
 
 def load_config():
     config_path = config_file()
@@ -66,6 +81,44 @@ def load_config():
         return json.loads(config_path.read_text())
     else:
         return {}
+
+
+def datasette():
+    script_dir = pathlib.Path(__file__).parent
+    return Datasette(
+        files=["tils.db"],
+        static_mounts=[("static", script_dir / "static")],
+        plugins_dir=script_dir / "plugins",
+        template_dir=script_dir / "templates",
+    )
+
+
+def serve_datasette():
+    ds = datasette()
+
+    # Get the ASGI application and serve it
+    app = ds.app()
+    uvicorn.run(app, host="localhost", port=8001)
+
+
+@async_to_sync
+async def get(urls=None):
+    ds = datasette()
+    await ds.invoke_startup()
+
+    for url in urls:
+        echo(f"GET {url}")
+        httpx_response = await ds.client.request(
+            "GET",
+            url,
+            follow_redirects=False,
+            avoid_path_rewrites=True,
+        )
+        echo(httpx_response.text)
+
+
+def create_html():
+    echo("create_html")
 
 
 def build_database(repo_path):
@@ -100,7 +153,6 @@ def build_database(repo_path):
         }
         if (body != previous_body) or not previous_html:
 
-            # record["html"] = github_markdown(body, path)
             record["html"] = markdown.markdown(body)
             print("Rendered HTML for {}".format(path))
 
@@ -118,42 +170,7 @@ def build_database(repo_path):
     )
 
 
-def github_markdown(body, path):
-    retries = 0
-    response = None
-    html = None
-    while retries < 3:
-        headers = {}
-        if os.environ.get("MARKDOWN_GITHUB_TOKEN"):
-            headers = {
-                "authorization": "Bearer {}".format(
-                    os.environ["MARKDOWN_GITHUB_TOKEN"]
-                )
-            }
-        response = httpx.post(
-            "https://api.github.com/markdown",
-            json={
-                # mode=gfm would expand #13 issue links and suchlike
-                "mode": "markdown",
-                "text": body,
-            },
-            headers=headers,
-        )
-        if response.status_code == 200:
-            html = response.text
-            break
-        elif response.status_code == 401:
-            assert False, "401 Unauthorized error rendering markdown"
-        else:
-            print(response.status_code, response.headers)
-            print("  sleeping 60s")
-            time.sleep(60)
-            retries += 1
-    else:
-        assert False, "Could not render {} - last response was {}".format(
-            path, response.headers
-        )
-    return html
+
 
 
 def first_paragraph_text_only(html):
@@ -169,11 +186,12 @@ def first_paragraph_text_only(html):
     try:
         soup = BeautifulSoup(html, "html.parser")
         # Attempt to find the first paragraph and extract its text
-        first_paragraph = soup.find('p')
-        return ' '.join(first_paragraph.stripped_strings)
+        first_paragraph = soup.find("p")
+        return " ".join(first_paragraph.stripped_strings)
     except AttributeError:
         # Handle the case where 'soup.find('p')' returns None
         return ""
+
 
 def created_changed_times(repo_path, ref="main"):
     """
@@ -228,4 +246,3 @@ def created_changed_times(repo_path, ref="main"):
                 }
             )
     return created_changed_times
-

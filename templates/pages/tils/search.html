@@ -1,0 +1,63 @@
+{% extends "til_base.html" %}
+
+{% block title %}TIL search: {{ q }}{% endblock %}
+
+{% block extra_head %}
+<style>
+input[type=search] {
+    padding: .25em;
+    font-size: 16px;
+    width: 60%;
+}
+
+input[type=submit] {
+    box-sizing: border-box;
+    color: #fff;
+    background-color: #007bff;
+    border-color: #007bff;
+    font-weight: 400;
+    cursor: pointer;
+    text-align: center;
+    vertical-align: middle;
+    border-width: 1px;
+    border-style: solid;
+    padding: .5em 0.8em;
+    font-size: 16px;
+    line-height: 1;
+    border-radius: .25rem;
+}
+pre {
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+}
+pre strong {
+    background-color: yellow;
+}
+</style>
+{% endblock %}
+{% block body %}
+<h1>TIL search: {{ q }}</h1>
+
+<form action="/tils/search">
+    <p>
+        <input type="search" name="q" value="{{ q }}">
+        <input type="submit" value="Search">
+    </p>
+</form>
+
+
+{% if q %}
+    {% set results = search_results(q) %}
+{% endif %}
+
+{% if q and not results %}
+    <p><em>No results for "{{ q }}"</em></p>
+{% endif %}
+
+
+{% for til in results %}
+    <h3><span class="topic"><a href="/{{ til.topic }}">{{ til.topic }}</a></span> <a href="/{{ til.topic }}/{{ til.slug }}">{{ til.title }}</a> - {{ til.created[:10] }}</h3>
+    <pre>{{ highlight(til.summary)|safe }}</pre>
+{% endfor %}
+
+{% endblock %}

@@ -1,0 +1,75 @@
+{% extends "til_base.html" %}
+
+{% block title %}TIL{% endblock %}<!DOCTYPE html>
+
+{% block extra_head %}
+<link href="https://github.com/tilly-org" rel="me">
+<style>
+input[type=search] {
+    padding: .25em;
+    font-size: 16px;
+    width: 60%;
+}
+input[type=submit] {
+    box-sizing: border-box;
+    color: #fff;
+    background-color: #007bff;
+    border-color: #007bff;
+    font-weight: 400;
+    cursor: pointer;
+    text-align: center;
+    border-width: 1px;
+    border-style: solid;
+    padding: .5em 0.8em;
+    font-size: 16px;
+    line-height: 1;
+    border-radius: .25rem;
+    margin-left: 0.3em;
+}
+h1 {
+    font-family: Georgia, 'Times New Roman', Times, serif;
+}
+.topic {
+    background-color: #ccc;
+    padding: 3px;
+    border: 1px solid #777;
+    font-size: 0.65em;
+    position: relative;
+    top: -1px;
+}
+.topic a {
+    text-decoration: none;
+    color: black;
+}
+</style>
+{% endblock %}
+
+{% block body %}
+{% set til_count = sql("select count(*) from TIL", database="tils")[0][0] %}
+<h1>TIL</h1>
+
+
+
+<form action="/tils/search">
+    <p>
+        <input type="search" name="q" placeholder="Search {{ til_count }} TILs">
+        <input type="submit" value="Search">
+    </p>
+</form>
+
+<p><strong>Browse by topic:</strong>
+{% for row in sql("select topic, count(*) as num_tils from til group by topic order by topic", database="tils") %}
+  <a title="{{ row.num_tils }} TIL{{ "s" if row.num_tils > 1 else "" }}" href="/{{ row.topic }}">{{ row.topic }}</a> {{ row.num_tils }}{% if not loop.last %} &middot;{% endif %}
+{% endfor %}
+</p>
+
+<h2>Recent TILs</h2>
+
+{% for til in sql("select * from til order by created_utc desc limit 30", database="tils") %}
+    <h3><span class="topic"><a href="/{{ til.topic }}">{{ til.topic }}</a></span> <a href="/{{ til.topic }}/{{ til.slug }}">{{ til.title }}</a> - {{ til.created[:10] }}</h3>
+    {{ first_paragraph(til["html"]).replace("</p>", " &#8230; </p>")|safe }}
+{% endfor %}
+
+<p><a href="/all">Browse all {{ til_count }} TILs</a></p>
+
+{% endblock %}
