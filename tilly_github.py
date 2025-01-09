@@ -153,7 +153,8 @@ def build_database(repo_path):
         }
         if (body != previous_body) or not previous_html:
 
-            record["html"] = markdown.markdown(body)
+            record["html"] = github_markdown(body)
+            # record["html"] = markdown.markdown(body)
             print("Rendered HTML for {}".format(path))
 
         # Populate summary
@@ -169,6 +170,42 @@ def build_database(repo_path):
         ["title", "body"], tokenize="porter", create_triggers=True, replace=True
     )
 
+def github_markdown(body, path):
+    retries = 0
+    response = None
+    html = None
+    while retries < 3:
+        headers = {}
+        if os.environ.get("MARKDOWN_GITHUB_TOKEN"):
+            headers = {
+                "authorization": "Bearer {}".format(
+                    os.environ["MARKDOWN_GITHUB_TOKEN"]
+                )
+            }
+        response = httpx.post(
+            "https://api.github.com/markdown",
+            json={
+                # mode=gfm would expand #13 issue links and suchlike
+                "mode": "markdown",
+                "text": body,
+            },
+            headers=headers,
+        )
+        if response.status_code == 200:
+            html = response.text
+            break
+        elif response.status_code == 401:
+            assert False, "401 Unauthorized error rendering markdown"
+        else:
+            print(response.status_code, response.headers)
+            print("  sleeping 60s")
+            time.sleep(60)
+            retries += 1
+    else:
+        assert False, "Could not render {} - last response was {}".format(
+            path, response.headers
+        )
+    return html
 
 
 
