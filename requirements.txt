@@ -4,7 +4,6 @@ GitPython
 sqlite-utils>=3.2
 beautifulsoup4
 httpx
-markdown
 datasette>=0.65.1
 # datasette-atom>=0.7
 # datasette-publish-fly

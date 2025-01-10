@@ -1,5 +1,6 @@
 import json
 import pathlib
+import shutil
 
 import click
 from click import echo
@@ -18,7 +19,7 @@ from urllib.parse import urlencode
 import sqlite_utils
 from sqlite_utils.db import NotFoundError
 import time
-import markdown
+
 
 from datasette.app import Datasette
 import uvicorn
@@ -51,8 +52,11 @@ def til_command(cli):
     @github.command(name="gen_static")
     def gen_static():
         """Generate static site from tils.db using datasette."""
-        urls = ["/", "/cat_a/til_1"]
-        get(urls=urls)
+        db = database(root)
+        urls = ['/'] + [f'/{row["topic"]}/{row["slug"]}' for row in db.query("SELECT topic, slug FROM til")]
+
+        pages = get(urls=urls)
+        write_html(pages)
 
     @github.command(name="config")
     @click.option("url", "-u", "--url", help="Base url where posts will be published.")
@@ -106,26 +110,42 @@ async def get(urls=None):
     ds = datasette()
     await ds.invoke_startup()
 
+    pages = []
     for url in urls:
-        echo(f"GET {url}")
         httpx_response = await ds.client.request(
             "GET",
             url,
             follow_redirects=False,
             avoid_path_rewrites=True,
         )
-        echo(httpx_response.text)
+        pages.append({"url": url, "html": httpx_response.text})
+
+    return pages
+
+def write_html(pages):
+    static_root = root / "_static"
+    echo(f"write_html to {static_root}")
+
+    # clear the directory
+    if static_root.exists():
+        shutil.rmtree(static_root / "_static", ignore_errors=True)
+
+    for page in pages:
+        path = static_root / page["url"].lstrip("/") / "index.html"
+        echo(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(page["html"])
 
 
-def create_html():
-    echo("create_html")
+def database(repo_path):
+    return sqlite_utils.Database(repo_path / "tils.db")
 
 
 def build_database(repo_path):
     echo(f"build_database {repo_path}")
     config = load_config()
     all_times = created_changed_times(repo_path)
-    db = sqlite_utils.Database(repo_path / "tils.db")
+    db = database(repo_path)
     table = db.table("til", pk="path")
     for filepath in root.glob("*/*.md"):
         fp = filepath.open()
@@ -153,8 +173,7 @@ def build_database(repo_path):
         }
         if (body != previous_body) or not previous_html:
 
-            record["html"] = github_markdown(body)
-            # record["html"] = markdown.markdown(body)
+            record["html"] = github_markdown(body, path)
             print("Rendered HTML for {}".format(path))
 
         # Populate summary
