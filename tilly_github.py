@@ -39,24 +39,37 @@ def til_command(cli):
     def github():
         """Publish TILs with github."""
 
+    # options shared by multiple commands
+    template_dir_option = click.option(
+        '--template-dir',
+        type=click.Path(exists=True, file_okay=False, dir_okay=True),
+        help='Override the default template directory.')
+
     @github.command(name="build")
     def github_build():
         """Build database tils.db."""
         build_database(root)
 
     @github.command(name="serve")
-    def serve():
+    @template_dir_option
+    def serve(template_dir):
         """Serve tils.db using datasette."""
-        serve_datasette()
+        serve_datasette(template_dir)
 
-    @github.command(name="gen_static")
-    def gen_static():
+    @github.command(name="gen-static")
+    @template_dir_option
+    def gen_static(template_dir):
         """Generate static site from tils.db using datasette."""
         db = database(root)
         urls = ['/'] + [f'/{row["topic"]}/{row["slug"]}' for row in db.query("SELECT topic, slug FROM til")]
 
-        pages = get(urls=urls)
+        pages = get(urls=urls, template_dir=template_dir)
         write_html(pages)
+
+    @github.command(name="copy-templates")
+    def copy():
+        """Copy default templates to current repo for customization."""
+        copy_templates()
 
     @github.command(name="config")
     @click.option("url", "-u", "--url", help="Base url where posts will be published.")
@@ -74,6 +87,22 @@ def til_command(cli):
         echo(json.dumps(config, indent=4, default=str))
 
 
+def copy_templates(template_dir="templates"):
+    script_dir = pathlib.Path(__file__).parent
+    src = script_dir / "templates"
+    dst = root
+
+    try:
+        # Ensure the destination directory exists
+        if not os.path.exists(dst):
+            os.makedirs(dst)
+
+        shutil.copytree(src, os.path.join(dst, os.path.basename(src)), dirs_exist_ok=True)
+        print(f"Successfully copied default templates to {dst}")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        raise
+
 def config_file():
     return get_app_dir() / "github_config.json"
 
@@ -87,18 +116,21 @@ def load_config():
         return {}
 
 
-def datasette():
+def datasette(template_dir=None):
     script_dir = pathlib.Path(__file__).parent
+
+    template_dir = template_dir or script_dir / "templates"
+
     return Datasette(
         files=["tils.db"],
         static_mounts=[("static", script_dir / "static")],
         plugins_dir=script_dir / "plugins",
-        template_dir=script_dir / "templates",
+        template_dir=template_dir,
     )
 
 
-def serve_datasette():
-    ds = datasette()
+def serve_datasette(template_dir=None):
+    ds = datasette(template_dir=template_dir)
 
     # Get the ASGI application and serve it
     app = ds.app()
@@ -106,8 +138,8 @@ def serve_datasette():
 
 
 @async_to_sync
-async def get(urls=None):
-    ds = datasette()
+async def get(urls=None, template_dir=None):
+    ds = datasette(template_dir)
     await ds.invoke_startup()
 
     pages = []
