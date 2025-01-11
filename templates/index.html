@@ -49,13 +49,14 @@ h1 {
 <h1>TIL</h1>
 
 
-
+{% if enable_search %}
 <form action="/tils/search">
     <p>
         <input type="search" name="q" placeholder="Search {{ til_count }} TILs">
         <input type="submit" value="Search">
     </p>
 </form>
+{% endif %}
 
 <p><strong>Browse by topic:</strong>
 {% for row in sql("select topic, count(*) as num_tils from til group by topic order by topic", database="tils") %}

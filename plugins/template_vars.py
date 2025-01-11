@@ -1,7 +1,9 @@
+import os
+import re
+import html
+
 from datasette import hookimpl
 from bs4 import BeautifulSoup as Soup
-import html
-import re
 
 non_alphanumeric = re.compile(r"[^a-zA-Z0-9\s]")
 multi_spaces = re.compile(r"\s+")
@@ -63,3 +65,10 @@ def extra_template_vars(request, datasette):
 @hookimpl
 def prepare_connection(conn):
     conn.create_function("first_paragraph", 1, first_paragraph)
+
+@hookimpl
+def prepare_jinja2_environment(env):
+    if os.environ.get("TILLY_ENABLE_SEARCH", "True") == "True":
+        env.globals['enable_search'] = True
+    else:
+        env.globals['enable_search'] = False

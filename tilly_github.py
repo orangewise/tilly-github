@@ -1,3 +1,4 @@
+import os
 import json
 import pathlib
 import shutil
@@ -13,8 +14,6 @@ from bs4 import BeautifulSoup
 from datetime import timezone
 import httpx
 import git
-import os
-import pathlib
 from urllib.parse import urlencode
 import sqlite_utils
 from sqlite_utils.db import NotFoundError
@@ -26,7 +25,6 @@ import uvicorn
 from asgiref.sync import async_to_sync
 
 root = pathlib.Path.cwd()
-
 
 @hookimpl
 def til_command(cli):
@@ -60,6 +58,9 @@ def til_command(cli):
     @template_dir_option
     def gen_static(template_dir):
         """Generate static site from tils.db using datasette."""
+        # disable search
+        os.environ['TILLY_ENABLE_SEARCH'] = 'False'
+
         db = database(root)
         urls = ['/'] + [f'/{row["topic"]}/{row["slug"]}' for row in db.query("SELECT topic, slug FROM til")]
 
@@ -118,7 +119,6 @@ def load_config():
 
 def datasette(template_dir=None):
     script_dir = pathlib.Path(__file__).parent
-
     template_dir = template_dir or script_dir / "templates"
 
     return Datasette(
