@@ -6,6 +6,7 @@ with open('requirements.txt', 'r') as f:
 setup(
     name="tilly-github",
     version="0.0.1",
+    url="https://github.com/tilly-pub/tilly-github",
     py_modules=["tilly_github"],
     install_requires=requirements,
     entry_points={
