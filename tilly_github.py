@@ -73,18 +73,32 @@ def til_command(cli):
         copy_templates()
 
     @github.command(name="config")
-    @click.option("url", "-u", "--url", help="Base url where posts will be published.")
-    def config(url):
+    @click.option("local_config", "-l", "--local", is_flag=True, help="Local config.")
+    @click.option("url", "-ou", "--url", help="The url for the static site.")
+    @click.option("output_folder", "-o", "--output_folder", help="The output folder for the static site.")
+    def config(local_config, url, output_folder="_static"):
         """List config."""
-        config_path = config_file()
 
-        config = {"url": url}
+        config = {}
 
-        if url:
-            with open(config_path, "w") as f:
+        # if global_config and local_config:
+        #     echo("Only one of --global or --local can be used.")
+        #     return
+
+        if local_config:
+            print("load local config")
+            config = load_config(local_config=load_config)
+
+        if local_config and url:
+            config["url"] = url
+            with open(local_config_file(), "w") as f:
                 json.dump(config, f, indent=4)
 
-        echo(config_path)
+        if local_config and output_folder:
+            config["output_folder"] = output_folder
+            with open(local_config_file(), "w") as f:
+                json.dump(config, f, indent=4)
+
         echo(json.dumps(config, indent=4, default=str))
 
 
@@ -104,17 +118,18 @@ def copy_templates(template_dir="templates"):
         print(f"An error occurred: {e}")
         raise
 
-def config_file():
-    return get_app_dir() / "github_config.json"
+def global_config_file():
+    return get_app_dir() / "config.json"
 
+def local_config_file():
+    return root / "config.json"
 
-def load_config():
-    config_path = config_file()
+def load_config(global_config=None, local_config=None):
+    if global_config:
+        return json.loads(global_config_file().read_text()) if global_config_file().exists() else {}
 
-    if config_path.exists():
-        return json.loads(config_path.read_text())
-    else:
-        return {}
+    if local_config:
+        return json.loads(local_config_file().read_text()) if local_config_file().exists() else {}
 
 
 def datasette(template_dir=None):
@@ -175,7 +190,7 @@ def database(repo_path):
 
 def build_database(repo_path):
     echo(f"build_database {repo_path}")
-    config = load_config()
+    config = load_config(local_config=True)
     all_times = created_changed_times(repo_path)
     db = database(repo_path)
     table = db.table("til", pk="path")
