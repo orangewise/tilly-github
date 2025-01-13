@@ -52,6 +52,8 @@ def til_command(cli):
     @template_dir_option
     def serve(template_dir):
         """Serve tils.db using datasette."""
+        add_config_to_env()
+
         serve_datasette(template_dir)
 
     @github.command(name="gen-static")
@@ -60,6 +62,7 @@ def til_command(cli):
         """Generate static site from tils.db using datasette."""
         # disable search
         os.environ['TILLY_ENABLE_SEARCH'] = 'False'
+        add_config_to_env()
 
         db = database(root)
         urls = ['/'] + [f'/{row["topic"]}/{row["slug"]}' for row in db.query("SELECT topic, slug FROM til")]
@@ -74,33 +77,37 @@ def til_command(cli):
 
     @github.command(name="config")
     @click.option("local_config", "-l", "--local", is_flag=True, help="Local config.")
-    @click.option("url", "-ou", "--url", help="The url for the static site.")
+    @click.option("url", "-u", "--url", help="The url for the static site.")
+    @click.option("google_analytics", "-g", "--google-analytics", help="Your Google Analytics id.")
     @click.option("output_folder", "-o", "--output_folder", help="The output folder for the static site.")
-    def config(local_config, url, output_folder="_static"):
+    def config(local_config, url, google_analytics, output_folder="_static"):
         """List config."""
 
         config = {}
 
-        # if global_config and local_config:
-        #     echo("Only one of --global or --local can be used.")
-        #     return
-
         if local_config:
-            print("load local config")
             config = load_config(local_config=load_config)
 
-        if local_config and url:
-            config["url"] = url
-            with open(local_config_file(), "w") as f:
+            # Update config with provided parameters
+            if url:
+                config['TILLY_URL'] = url
+            if google_analytics:
+                config['TILLY_GOOGLE_ANALYTICS'] = google_analytics
+            if output_folder:
+                config['TILLY_OUTPUT_FOLDER'] = output_folder
+
+            # Save the updated config
+            with open(local_config_file(), 'w') as f:
                 json.dump(config, f, indent=4)
 
-        if local_config and output_folder:
-            config["output_folder"] = output_folder
-            with open(local_config_file(), "w") as f:
-                json.dump(config, f, indent=4)
+        # Print the configuration
+        print(json.dumps(config, indent=4, default=str))
+        return config
 
-        echo(json.dumps(config, indent=4, default=str))
-
+def add_config_to_env():
+    """ASdd config to environment."""
+    config = load_config(local_config=True)
+    os.environ = {**os.environ, **config}
 
 def copy_templates(template_dir="templates"):
     script_dir = pathlib.Path(__file__).parent

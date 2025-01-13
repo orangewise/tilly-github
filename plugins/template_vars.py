@@ -72,3 +72,8 @@ def prepare_jinja2_environment(env):
         env.globals['enable_search'] = True
     else:
         env.globals['enable_search'] = False
+
+    # tilly config to env.globals
+    tilly_config_vars = {k: v for k,v in os.environ.items() if k.startswith("TILLY_")}
+    env.globals = {**env.globals, **tilly_config_vars}
+
