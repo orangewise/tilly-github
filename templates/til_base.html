@@ -12,6 +12,14 @@ body {
     line-height: 1.4;
     margin: 0;
     padding: 0;
+    display: flex; /* Use Flexbox */
+    flex-direction: column; /* Stack items vertically */
+    min-height: 100vh; /* Ensure body takes at least full viewport height */
+}
+section.body {
+    flex: 1; /* This makes the body grow to fill available space */
+    padding: 0.5em 2em;
+    max-width: 800px;
 }
 h1 {
     font-family: Georgia, 'Times New Roman', Times, serif;
@@ -96,6 +104,30 @@ blockquote {
     border-left: 0.75em solid #9e6bb52e;
     padding-left: 0.75em;
 }
+div#ft {
+  background: linear-gradient(
+    to bottom,
+    rgb(154, 103, 175) 0%,
+    rgb(96, 72, 129) 49%,
+    rgb(100, 67, 130) 100%
+  );
+  text-align: center;
+  margin: 15px 0 0.4em 0;
+  padding: 10px 0;
+  clear: both;
+  font-size: 0.85em;
+}
+div#ft ul,
+div#ft li {
+  display: inline;
+  padding-right: 1em;
+  color: #fff;
+}
+div#ft a {
+  color: #fff;
+  text-decoration: none;
+  border-bottom: none;
+}
 </style>
 </head>
 <body>
@@ -105,5 +137,11 @@ blockquote {
 <section class="body">
 {% block body %}{% endblock %}
 </section>
+<div id="ft">
+    <ul>
+      <li>Built with <a href="https://tilly-pub.github.io/">tilly</a></li>
+      <li>©</li>
+    </ul>
+</div>
 </body>
 </html>
