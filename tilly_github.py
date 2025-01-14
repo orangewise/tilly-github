@@ -83,7 +83,7 @@ def til_command(cli):
 
     @github.command(name="config")
     @click.option("local_config", "-l", "--local", is_flag=True, help="Local config.")
-    @click.option("url", "-u", "--url", help="The url for the static site.")
+    @click.option("url", "-u", "--url", help="The github repo https url.")
     @click.option("google_analytics", "-g", "--google-analytics", help="Your Google Analytics id.")
     @click.option("output_folder", "-o", "--output-folder", help="The output folder for the static site.")
     def config(local_config, url, google_analytics, output_folder="_static"):
@@ -96,7 +96,7 @@ def til_command(cli):
 
             # Update config with provided parameters
             if url:
-                config['TILLY_URL'] = url
+                config['TILLY_GITHUB_URL'] = url
             if google_analytics:
                 config['TILLY_GOOGLE_ANALYTICS'] = google_analytics
             if output_folder:

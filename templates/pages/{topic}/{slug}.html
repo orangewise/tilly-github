@@ -46,7 +46,16 @@ document.addEventListener('DOMContentLoaded', () => {
 {% endif %}
 #}
 
-<p class="created">Created {{ til.created }}{% if til.created != til.updated %}, updated {{ til.updated }} &middot; <a href="{{ til.url|replace("https://github.com/simonw/til/blob/", "https://github.com/simonw/til/commits/") }}">History</a>{% endif %} &middot; <a href="{{ til.url }}">Edit</a></p>
+<p class="created">Created {{ til.created }}
+  {%- if til.created != til.updated %}, updated {{ til.updated }}
+    {%- if TILLY_GITHUB_URL %}
+    &middot; <a href="{{ TILLY_GITHUB_URL }}/commits/main/{{ til.url }}">History</a>
+    {%- endif %}
+  {% endif %}
+  {%- if TILLY_GITHUB_URL %}
+  &middot; <a href="{{ TILLY_GITHUB_URL }}/blob/main/{{ til.url }}">Edit</a>
+  {%- endif %}
+</p>
 
 <script>
 // Add visible # links to all h2+ headings
