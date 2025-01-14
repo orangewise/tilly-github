@@ -62,13 +62,19 @@ def til_command(cli):
         """Generate static site from tils.db using datasette."""
         # disable search
         os.environ['TILLY_ENABLE_SEARCH'] = 'False'
+
         add_config_to_env()
 
         db = database(root)
-        urls = ['/'] + [f'/{row["topic"]}/{row["slug"]}' for row in db.query("SELECT topic, slug FROM til")]
-
+        urls = (
+            ['/'] +
+            [f'/{row["topic"]}/{row["slug"]}' for row in db.query("SELECT topic, slug FROM til")] +
+            ['/all'] +
+            [f'/{row["topic"]}' for row in db.query("SELECT DISTINCT topic FROM til")]
+        )
         pages = get(urls=urls, template_dir=template_dir)
         write_html(pages)
+        write_static()
 
     @github.command(name="copy-templates")
     def copy():
@@ -79,7 +85,7 @@ def til_command(cli):
     @click.option("local_config", "-l", "--local", is_flag=True, help="Local config.")
     @click.option("url", "-u", "--url", help="The url for the static site.")
     @click.option("google_analytics", "-g", "--google-analytics", help="Your Google Analytics id.")
-    @click.option("output_folder", "-o", "--output_folder", help="The output folder for the static site.")
+    @click.option("output_folder", "-o", "--output-folder", help="The output folder for the static site.")
     def config(local_config, url, google_analytics, output_folder="_static"):
         """List config."""
 
@@ -138,7 +144,6 @@ def load_config(global_config=None, local_config=None):
     if local_config:
         return json.loads(local_config_file().read_text()) if local_config_file().exists() else {}
 
-
 def datasette(template_dir=None):
     script_dir = pathlib.Path(__file__).parent
     template_dir = template_dir or script_dir / "templates"
@@ -149,7 +154,6 @@ def datasette(template_dir=None):
         plugins_dir=script_dir / "plugins",
         template_dir=template_dir,
     )
-
 
 def serve_datasette(template_dir=None):
     ds = datasette(template_dir=template_dir)
@@ -177,18 +181,36 @@ async def get(urls=None, template_dir=None):
     return pages
 
 def write_html(pages):
-    static_root = root / "_static"
+    config = load_config(local_config=True)
+    output_folder = config.get("TILLY_OUTPUT_FOLDER", "_static")
+    static_root = root / output_folder
     echo(f"write_html to {static_root}")
 
     # clear the directory
     if static_root.exists():
         shutil.rmtree(static_root / "_static", ignore_errors=True)
 
+    # skip jekyll
+    no_jekyll = root / ".nojekyll"
+    no_jekyll.touch()
+
     for page in pages:
         path = static_root / page["url"].lstrip("/") / "index.html"
         echo(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(page["html"])
+
+def write_static():
+    config = load_config(local_config=True)
+    output_folder = config.get("TILLY_OUTPUT_FOLDER", "_static")
+
+    script_dir = pathlib.Path(__file__).parent
+    src = script_dir / "static"
+    dst = root / output_folder
+
+    echo(dst / "static")
+
+    shutil.copytree(src, os.path.join(dst, os.path.basename(src)), dirs_exist_ok=True)
 
 
 def database(repo_path):
